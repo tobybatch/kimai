@@ -1,0 +1,90 @@
+name: 'Docker Build'
+# act -j build -W ./.github/workflows/docker.yaml --secret-file  .dockerhub.secrets
+
+on:
+    workflow_dispatch:
+    release:
+        types: [released]
+
+jobs:
+    build:
+
+    test:
+        strategy:
+            matrix:
+                type: [ dev, prod ]
+                server: [ fpm, apache ]
+        runs-on: ubuntu-latest
+
+        steps:
+
+            - name: Pull images
+              run: docker pull kimai/kimai2:${{ matrix.server }}-${{ matrix.type }}-unstable
+
+            - name: Test Lite
+              run: docker run --rm --entrypoint /self-test.sh kimai/kimai2:${{ matrix.server }}-${{ matrix.type }}-unstable
+
+    tag:
+        needs: build
+        runs-on: ubuntu-latest
+        steps:
+
+            - uses: actions/checkout@v2
+
+            - name: Set env
+              run: echo "RELEASE_VERSION=${GITHUB_REF#refs/*/}" >> $GITHUB_ENV
+
+            - name: Login to DockerHub
+              uses: docker/login-action@v2
+              with:
+                  username: ${{secrets.DOCKERHUB_USERNAME}}
+                  password: ${{secrets.DOCKERHUB_PASSWORD}}
+
+            - name: Pull images
+              run: |
+                  docker pull kimai/kimai2:fpm-prod-unstable
+                  docker pull kimai/kimai2:fpm-dev-unstable
+                  docker pull kimai/kimai2:apache-prod-unstable
+                  docker pull kimai/kimai2:apache-dev-unstable
+
+            - name: Tag fpm prod
+              run: |
+                  docker tag kimai/kimai2:fpm-prod-unstable kimai/kimai2:fpm-prod
+                  docker tag kimai/kimai2:fpm-prod-unstable kimai/kimai2:fpm-prod-${{ RELEASE_VERSION }}
+                  docker tag kimai/kimai2:fpm-prod-unstable kimai/kimai2:fpm
+                  docker tag kimai/kimai2:fpm-prod-unstable kimai/kimai2:fpm-latest
+                  docker tag kimai/kimai2:fpm-prod-unstable kimai/kimai2:latest
+                  docker tag kimai/kimai2:fpm-prod-unstable kimai/kimai2:prod
+                  docker push kimai/kimai2:fpm-prod
+                  docker push kimai/kimai2:fpm-prod
+                  docker push kimai/kimai2:fpm
+                  docker push kimai/kimai2:fpm-latest
+                  docker push kimai/kimai2:latest
+                  docker push kimai/kimai2:prod
+
+            - name: Tag fpm dev
+              run: |
+                  docker tag kimai/kimai2:fpm-dev-unstable kimai/kimai2:fpm-dev
+                  docker tag kimai/kimai2:fpm-dev-unstable kimai/kimai2:fpm-dev-${{ RELEASE_VERSION }}
+                  docker push kimai/kimai2:fpm
+                  docker push kimai/kimai2:fpm-${{ RELEASE_VERSION }}
+
+            - name: Tag apache prod
+              run: |
+                  docker tag kimai/kimai2:apache-prod-unstable kimai/kimai2:apache-prod
+                  docker tag kimai/kimai2:apache-prod-unstable kimai/kimai2:apache-prod-${{ RELEASE_VERSION }}
+                  docker tag kimai/kimai2:apache-prod-unstable kimai/kimai2:apache
+                  docker tag kimai/kimai2:apache-prod-unstable kimai/kimai2:apache-latest
+                  docker push kimai/kimai2:apache-prod
+                  docker push kimai/kimai2:apache-prod-${{ RELEASE_VERSION }}
+                  docker push kimai/kimai2:apache
+                  docker push kimai/kimai2:apache-latest
+
+            - name: Tag apache dev
+              run: |
+                  docker tag kimai/kimai2:apache-dev-unstable kimai/kimai2:apache-dev
+                  docker tag kimai/kimai2:apache-dev-unstable kimai/kimai2:apache-dev-${{ RELEASE_VERSION }}
+                  docker tag kimai/kimai2:apache-dev-unstable kimai/kimai2:dev
+                  docker push kimai/kimai2:apache-dev
+                  docker push kimai/kimai2:apache-dev-${{ RELEASE_VERSION }}
+                  docker push kimai/kimai2:dev
